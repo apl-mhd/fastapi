@@ -1,3 +1,4 @@
+from ast import While
 from gettext import find
 import http
 from turtle import pos
@@ -6,6 +7,10 @@ from fastapi import FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
 from random import randrange
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import time
+
 
 
 app = FastAPI()
@@ -16,7 +21,20 @@ class Post(BaseModel):
     content: str
     published: bool = True
     rating: Optional[int] = None
-    
+
+while True:
+    try:
+        conn =  psycopg2.connect(host='localhost', database='fastapi', user='postgres',
+                                password='admin', cursor_factory=RealDictCursor)
+        cursor = conn.cursor()
+        print('database successfully connected')
+        break
+
+    except Exception as error:
+        print("Connecting to database failed")
+        print("error", error)
+        time.sleep(2)
+        
 
 my_posts = [
     {'title': 'tile2', 'content': 'content1', 'id':1},
