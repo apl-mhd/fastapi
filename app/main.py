@@ -1,4 +1,4 @@
-from ast import While
+from ast import Not, While
 from gettext import find
 import http
 from turtle import pos
@@ -58,18 +58,21 @@ def root():
 
 @app.get("/posts")
 def get_posts():
-    cursor.execute("""SELECT * FROM products""")
+    cursor.execute("""SELECT * FROM posts""")
     posts =  cursor.fetchall()
     print(posts)
     return {"data": posts}
 
 
-@app.post('/createposts')
-def create_posts(new_post: Post):
-    post = new_post.dict()
-    post['id'] = randrange(0,100000)
-    my_posts.append(post)
-    return {"data":  my_posts}
+@app.post('/posts')
+def create_posts(post: Post):
+    cursor.execute(""" INSERT INTO posts (title, content, published) values(%s, %s, %s) RETURNING * """,
+                   (post.title, post.content, post.published))
+    
+    new_post = cursor.fetchone()
+    conn.commit()
+    
+    return {"data":  new_post}
 
 
 
@@ -81,30 +84,39 @@ def get_latest_post():
 
 
 @app.get('/posts/{id}')
-def get_post(id: int, response: Response):
-    post = find_post(int(id))
-    if not post:
+def get_post(id: int):
+    cursor.execute("""SELECT * FROM posts WHERE id = %s """, (str(id),))
+    test_post = cursor.fetchone()
+    print(test_post, type(id))
+    #post = find_post(int(id))
+    if not test_post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
-    return {"post_detail": post}
+    return {"post_detail": test_post}
 
 
 @app.delete('/posts/{id}', status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id:int):
-    
-    index = find_index_post(id)
-    if index == None:
+    cursor.execute(""" DELETE FROM posts WHERE id = %s RETURNING * """, (str(id),))
+    deleted_post = cursor.fetchone()
+    conn.commit()
+    if deleted_post == None:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
-    my_posts.pop(index)
+    
     return Response(status_code=status.HTTP_204_NO_CONTENT) #{'message': 'post with id {id} successfully deleted'}
 
 @app.put('/posts/{id}')
 def update_post(id:int, post:Post):
-    index = find_index_post(id)
-    if index == None:
+    
+    cursor.execute(""" UPDATE posts SET title = %s, content = %s, published = %s 
+                   where id = %s returning *  """, 
+                   (post.title, post.content, post.published, id))
+    
+    updated_post = cursor.fetchall()
+    conn.commit()
+    
+    if not updated_post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
     
-    my_posts[index] = post
-    
-    return {"a": post}
+    return {"a": updated_post}
    
     
