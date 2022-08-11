@@ -1,26 +1,37 @@
-from ast import Not, While
-from gettext import find
-import http
-from turtle import pos
+from multiprocessing import synchronize
+from re import I
+from turtle import pos, title
 from typing import Optional
-from fastapi import FastAPI, Response, status, HTTPException
-from fastapi.params import Body
+from fastapi import FastAPI, Response, status, HTTPException, Depends
 from pydantic import BaseModel
 from random import randrange
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
+#from database import engine, session_local
+from . database_con import engine, session_local
+from sqlalchemy.orm import Session
+from . import models 
+from . schemas import Post
 
-
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+
+def get_db():
+    db = session_local()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class Post(BaseModel):
     title: str
     content: str
     published: bool = True
-    rating: Optional[int] = None
+   # rating: Optional[int] = None
 
 while True:
     try:
@@ -56,23 +67,33 @@ def find_index_post(id):
 def root():
     return {"message": "hello world"}
 
+@app.get("/sqlalchemy")
+def test_posts(db: Session = Depends(get_db)):
+    posts =  db.query(models.Post).all()
+    
+    return {"status": posts}
+
+
 @app.get("/posts")
-def get_posts():
-    cursor.execute("""SELECT * FROM posts""")
-    posts =  cursor.fetchall()
-    print(posts)
+def get_posts(db: Session = Depends(get_db)):
+    posts = db.query(models.Post).all()
     return {"data": posts}
 
 
 @app.post('/posts')
-def create_posts(post: Post):
-    cursor.execute(""" INSERT INTO posts (title, content, published) values(%s, %s, %s) RETURNING * """,
-                   (post.title, post.content, post.published))
+def create_posts(post: Post,db: Session = Depends(get_db)):
+    # cursor.execute(""" INSERT INTO posts (title, content, published) values(%s, %s, %s) RETURNING * """,
+    #                (post.title, post.content, post.published))
     
-    new_post = cursor.fetchone()
-    conn.commit()
+    # new_post = cursor.fetchone()
+    # conn.commit()
+    # return {"data":  new_post}
     
-    return {"data":  new_post}
+    new_post = models.Post(**post.dict())
+    db.add(new_post)
+    db.commit()
+    db.refresh(new_post)
+    return {'data': new_post}
 
 
 
@@ -84,24 +105,31 @@ def get_latest_post():
 
 
 @app.get('/posts/{id}')
-def get_post(id: int):
-    cursor.execute("""SELECT * FROM posts WHERE id = %s """, (str(id),))
-    test_post = cursor.fetchone()
-    print(test_post, type(id))
+def get_post(id: int, db: Session = Depends(get_db)):
+    # cursor.execute("""SELECT * FROM posts WHERE id = %s """, (str(id),))
+    # test_post = cursor.fetchone()
+    # print(test_post, type(id))
     #post = find_post(int(id))
-    if not test_post:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
-    return {"post_detail": test_post}
+    # if not test_post:
+    #     raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
+    # return {"post_detail": test_post}
+    post = db.query(models.Post).filter(models.Post.id == id).first()
+    
+    return {"data": post}
+
 
 
 @app.delete('/posts/{id}', status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id:int):
-    cursor.execute(""" DELETE FROM posts WHERE id = %s RETURNING * """, (str(id),))
-    deleted_post = cursor.fetchone()
-    conn.commit()
-    if deleted_post == None:
-        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
+def delete_post(id:int, db: Session = Depends(get_db)):
+    # cursor.execute(""" DELETE FROM posts WHERE id = %s RETURNING * """, (str(id),))
+    # deleted_post = cursor.fetchone()
+    # conn.commit()
+    post =  db.query(models.Post).filter(models.Post.id == id)
     
+    if not post.first():
+        raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
+    post.delete(synchronize_session = False)
+    db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT) #{'message': 'post with id {id} successfully deleted'}
 
 @app.put('/posts/{id}')
@@ -117,6 +145,6 @@ def update_post(id:int, post:Post):
     if not updated_post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
     
-    return {"a": updated_post}
+    return {"detail": updated_post}
    
     
