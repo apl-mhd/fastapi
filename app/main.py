@@ -2,7 +2,7 @@ from multiprocessing import synchronize
 from re import I
 from turtle import pos, title
 from typing import Optional
-from fastapi import FastAPI, Response, status, HTTPException, Depends
+from fastapi import FastAPI, Response, status, HTTPException, Depends   
 from pydantic import BaseModel
 from random import randrange
 import psycopg2
@@ -77,11 +77,11 @@ def test_posts(db: Session = Depends(get_db)):
 @app.get("/posts")
 def get_posts(db: Session = Depends(get_db)):
     posts = db.query(models.Post).all()
-    return {"data": posts}
+    return posts
 
 
 @app.post('/posts')
-def create_posts(post: Post,db: Session = Depends(get_db)):
+def create_posts(post: Post,db: Session = Depends(get_db), ):
     # cursor.execute(""" INSERT INTO posts (title, content, published) values(%s, %s, %s) RETURNING * """,
     #                (post.title, post.content, post.published))
     
@@ -93,14 +93,14 @@ def create_posts(post: Post,db: Session = Depends(get_db)):
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
-    return {'data': new_post}
+    return new_post
 
 
 
 @app.get('/posts/latest')
 def get_latest_post():
     post = my_posts[len(my_posts)-1]
-    return {"detail": post}
+    return post
 
 
 
@@ -115,7 +115,7 @@ def get_post(id: int, db: Session = Depends(get_db)):
     # return {"post_detail": test_post}
     post = db.query(models.Post).filter(models.Post.id == id).first()
     
-    return {"data": post}
+    return post
 
 
 
@@ -145,6 +145,10 @@ def update_post(id:int, post:Post):
     if not updated_post:
         raise HTTPException(status_code = status.HTTP_404_NOT_FOUND, detail=f"post with id {id} not found")
     
-    return {"detail": updated_post}
+    return updated_post
    
+@app.post('/users')
+def create_user():
+    pass
+    
     

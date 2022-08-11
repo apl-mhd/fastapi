@@ -1,8 +1,10 @@
-from http import server
-from sqlite3 import Timestamp
-from time import time
+from enum import unique
+from tkinter.tix import Tree
 from .database_con import Base
-from sqlalchemy import Column, Integer, Boolean, String,TIMESTAMP
+from sqlalchemy import Column, Integer, Boolean, String
+from sqlalchemy.sql.sqltypes import TIMESTAMP
+from sqlalchemy.sql.expression import text
+
 
 
 class Post(Base):
@@ -12,5 +14,14 @@ class Post(Base):
     title = Column(String, nullable=False)
     content = Column(String, nullable=False)
     published = Column(Boolean, default=True)
-    #created_at = Column(TIMESTAMP(timezone=True), nullable=True, server_default=func.now())
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
+
+    
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, nullable=False)
+    email = Column(String, nullable=False, unique=True)
+    password = Column(String, nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text('now()'))
     
