@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import Depends, status, HTTPException, APIRouter
 from .. import models
 from .. import schemas
+from .. import utils
 from passlib.context import CryptContext
 
 
@@ -20,8 +21,7 @@ def get_users(db: Session = Depends(get_db)):
 @router.post('/users', response_model=schemas.UserOut)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
-    hashed_password = pwd_context.hash(user.password)
-    user.password = hashed_password
+    user.password = utils.Hash(user.password)
     new_user = models.User(**user.dict())
     db.add(new_user)
     db.commit()
