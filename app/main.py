@@ -1,10 +1,8 @@
-from multiprocessing import synchronize
-from re import I
-from turtle import pos, title
-from typing import Optional
+
 from fastapi import FastAPI, Response, status, HTTPException, Depends   
 from pydantic import BaseModel
 from random import randrange
+from passlib.context import CryptContext
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import time
@@ -12,8 +10,10 @@ import time
 from . database_con import engine, session_local
 from sqlalchemy.orm import Session
 from . import models 
-from . schemas import Post
+from . schemas import Post, UserCreate, UserOut
 
+
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated="auto")
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
@@ -67,11 +67,6 @@ def find_index_post(id):
 def root():
     return {"message": "hello world"}
 
-@app.get("/sqlalchemy")
-def test_posts(db: Session = Depends(get_db)):
-    posts =  db.query(models.Post).all()
-    
-    return {"status": posts}
 
 
 @app.get("/posts")
@@ -115,6 +110,7 @@ def get_post(id: int, db: Session = Depends(get_db)):
     # return {"post_detail": test_post}
     post = db.query(models.Post).filter(models.Post.id == id).first()
     
+    
     return post
 
 
@@ -147,8 +143,26 @@ def update_post(id:int, post:Post):
     
     return updated_post
    
-@app.post('/users')
-def create_user():
-    pass
+@app.post('/users', response_model=UserOut)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    
+    hashed_password = pwd_context.hash(user.password)
+    user.password = hashed_password
+    new_user = models.User(**user.dict())
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
+
+@app.get("/users/{id}")
+def get_user(id: int, db:Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail= f'user not found')
+    
+    return user
+
+
     
     
